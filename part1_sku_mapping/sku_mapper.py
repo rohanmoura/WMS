@@ -1,9 +1,11 @@
-# sku_mapper.py
 import pandas as pd
 import os
 from datetime import datetime
+import re
+
 
 class MappingLoader:
+
     def __init__(self, mapping_file):
         self.mapping_file = mapping_file
         self.mapping_df = None
@@ -11,45 +13,51 @@ class MappingLoader:
         self.load_mapping()
 
     def load_mapping(self):
-        self.mapping_df = pd.read_excel(self.mapping_file, sheet_name="Msku With Skus")
+        # Load Master SKU mappings
+        self.mapping_df = pd.read_excel(self.mapping_file,
+                                        sheet_name="Msku With Skus")
         self.mapping_df.columns = self.mapping_df.columns.str.strip().str.lower()
 
-        self.combo_df = pd.read_excel(self.mapping_file, sheet_name="Combos skus")
-        self.combo_df.columns = self.combo_df.columns.str.strip()
+        # Load Combo SKUs
+        self.combo_df = pd.read_excel(self.mapping_file,
+                                      sheet_name="Combos skus")
+        self.combo_df.columns = self.combo_df.columns.str.strip().str.lower()
 
     def map_single_sku(self, sku):
+        if not re.match(r'^[A-Za-z0-9]+$', sku.strip()):
+            return None
+
         result = self.mapping_df[self.mapping_df['sku'] == sku.strip()]
-        if not result.empty:
-            return result.iloc[0]['msku']
-        return None
+        return result.iloc[0]['msku'] if not result.empty else None
 
-    def is_combo(self, sku):
-        return '+' in sku
-
-    def get_combo_parts(self, sku):
-        row = self.combo_df[self.combo_df['Combo '] == sku.strip()]
+    def get_combo_parts(self, combo_sku):
+        row = self.combo_df[self.combo_df['combo'] == combo_sku.strip()]
         if not row.empty:
             parts = []
-            for col in row.columns[1:15]:  # SKU1 to SKU14
+            for col in row.columns[1:]:  # Skip 'combo' column
                 val = row.iloc[0][col]
                 if pd.notna(val):
                     parts.append(val.strip())
             return parts
         return None
 
+
 class SalesProcessor:
-    def __init__(self, mapper: MappingLoader, sales_path: str):
+
+    def __init__(self, mapper: MappingLoader, sales_path: str, output_dir=""):
         self.mapper = mapper
         self.sales_path = sales_path
+        self.output_dir = output_dir
         self.sales_df = None
         self.logs = []
         self.output_df = None
+        self.sku_column = None
 
     def detect_sku_column(self, columns):
-        possible_names = ['SKU', 'MSKU', 'FNSKU', 'ASIN', 'Product Code']
+        possible_names = ['sku', 'msku', 'fnsku', 'asin', 'product code']
         for name in possible_names:
-            if name in columns:
-                return name
+            if name in columns.str.lower().tolist():
+                return columns[(columns.str.lower() == name)].values[0]
         return None
 
     def load_sales(self):
@@ -58,48 +66,72 @@ class SalesProcessor:
         else:
             self.sales_df = pd.read_excel(self.sales_path)
 
-        self.sales_df.columns = self.sales_df.columns.str.strip()
-        sku_column = self.detect_sku_column(self.sales_df.columns)
+        self.sales_df.columns = self.sales_df.columns.str.strip().str.lower()
+        self.sku_column = self.detect_sku_column(self.sales_df.columns)
 
-        if not sku_column:
-            raise ValueError("Sales sheet must contain a recognizable SKU column (e.g., 'SKU', 'FNSKU', 'ASIN').")
-
-        self.sku_column = sku_column
+        if not self.sku_column:
+            raise ValueError(
+                "Sales sheet must contain a recognizable SKU column (e.g., 'SKU', 'FNSKU', 'ASIN')."
+            )
 
     def process(self):
         self.load_sales()
-        mapped_rows = []
+        self.sales_df['msku'] = self.sales_df[self.sku_column].apply(self._map_sku)
+        self._generate_logs()
+        return self._save_output()
 
-        for _, row in self.sales_df.iterrows():
-            sku = str(row[self.sku_column]).strip()
-            msku = None
+    def _map_sku(self, sku):
+        sku = str(sku).strip()
+        if '+' in sku:
+            return self._process_combo(sku)
+        else:
+            msku = self.mapper.map_single_sku(sku)
+            if not msku:
+                self.logs.append(f"Unmapped SKU: {sku}")
+                return f"[MISSING:{sku}]"
+            return msku
 
-            if self.mapper.is_combo(sku):
-                parts = self.mapper.get_combo_parts(sku)
-                if parts:
-                    mapped_parts = [self.mapper.map_single_sku(p) or f"[MISSING:{p}]" for p in parts]
-                    msku = '+'.join(mapped_parts)
-                else:
-                    msku = f"[INVALID COMBO:{sku}]"
-                    self.logs.append(f"Invalid combo SKU not found in combo sheet: {sku}")
+    def _process_combo(self, combo_sku):
+        parts = self.mapper.get_combo_parts(combo_sku)
+        if not parts:
+            self.logs.append(f"Invalid combo SKU: {combo_sku}")
+            return f"[INVALID COMBO:{combo_sku}]"
+
+        mapped_parts = []
+        for part in parts:
+            mapped = self.mapper.map_single_sku(part)
+            if mapped:
+                mapped_parts.append(mapped)
             else:
-                msku = self.mapper.map_single_sku(sku)
-                if not msku:
-                    msku = f"[MISSING:{sku}]"
-                    self.logs.append(f"Unmapped SKU: {sku}")
+                mapped_parts.append(f"[MISSING:{part}]")
+                self.logs.append(f"Missing part in combo: {part}")
 
-            new_row = row.to_dict()
-            new_row['MSKU'] = msku
-            mapped_rows.append(new_row)
+        return '+'.join(mapped_parts)
 
-        self.output_df = pd.DataFrame(mapped_rows)
+    def _generate_logs(self):
+        missing_skus = [log for log in self.logs if "Unmapped" in log]
+        invalid_combos = [log for log in self.logs if "Invalid combo" in log]
+        missing_parts = [log for log in self.logs if "Missing part" in log]
+
+        summary = [
+            f"Total Rows Processed: {len(self.sales_df)}",
+            f"Total Unmapped SKUs: {len(missing_skus)}",
+            f"Invalid Combos: {len(invalid_combos)}",
+            f"Missing Parts in Combos: {len(missing_parts)}",
+            "---- Detailed Logs ----", *self.logs
+        ]
+        self.logs = summary
+
+    def _save_output(self):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        os.makedirs("part1_sku_mapping/output", exist_ok=True)
-        out_file = f"part1_sku_mapping/output/mapped_output_{timestamp}.xlsx"
-        log_file = f"part1_sku_mapping/output/mapping_log_{timestamp}.txt"
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir, exist_ok=True)
 
-        self.output_df.to_excel(out_file, index=False)
-        with open(log_file, "w") as f:
+        output_path = os.path.join(self.output_dir, f"mapped_output_{timestamp}.xlsx")
+        self.sales_df.to_excel(output_path, index=False)
+
+        log_path = os.path.join(self.output_dir, f"mapping_log_{timestamp}.txt")
+        with open(log_path, "w") as f:
             f.write("\n".join(self.logs))
 
-        return out_file, log_file
+        return output_path, log_path
