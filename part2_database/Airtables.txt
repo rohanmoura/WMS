@@ -1,0 +1,65 @@
+📊 Part 2: Setting up Airtable Dashboard for Sales Data
+
+This document explains how to use Airtable as a visual database to manage and analyze mapped sales data from Part 1.
+
+---
+
+✅ Step-by-Step Instructions:
+
+1. Go to Airtable using the invite link below:
+   🔗 https://airtable.com/invite/l?inviteId=invaevSA2u6Aqf2t3&inviteToken=8e9095e02cff4c853a0e3e253d81edbe4d920ff2db2d78bc7551310c84dbe15b&utm_medium=email&utm_source=product_team&utm_content=transactional-alerts
+
+2. Log in or sign up to Airtable.
+
+3. Create a new **Base** named:
+   ➤ WMS - Sales Dashboard
+
+4. Inside the base:
+   ➤ Create a new table named **Sales**
+
+5. Add the following columns (matching the output of Part 1):
+   - Order ID
+   - Date
+   - Platform
+   - SKU
+   - MSKU
+   - Quantity
+   - Price
+   - Channel
+   - Region
+   - Any other relevant columns
+
+6. Enable **Grid view** and optionally add a **Chart extension**:
+   ➤ Click "Extensions" > Add chart
+   ➤ Configure bar, pie, or line charts to visualize sales by MSKU, Platform, Region, etc.
+
+7. Get your **Airtable API Key**:
+   ➤ Account > Developer Hub > Generate API Token
+
+8. Get your **Base ID**:
+   ➤ From Airtable’s API documentation (https://airtable.com/api)
+
+9. Add your `API_KEY` and `BASE_ID` to a `.env` file in your project root.
+
+Example: AIRTABLE_API_KEY=your_token_here AIRTABLE_BASE_ID=app123456789
+
+
+10. The backend script (`airtable.py`) will use these to upload processed sales data automatically.
+
+---
+
+🧠 Logic Recap:
+
+Once the user uploads sales files and mapping is complete (via GUI or web), the mapped DataFrame is sent to Airtable via their REST API. This keeps the data centralized and ready for visualization.
+
+---
+
+📌 Notes:
+
+- You can use Table.ai or NoCodeDB as alternatives if preferred.
+- Use filters and group views in Airtable for easy drill-downs.
+- Make sure column names match exactly to avoid upload errors.
+
+---
+
+👨‍💻 Created by Rohan for CSTE WMS Automation Assignment
