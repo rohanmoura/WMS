@@ -68,29 +68,25 @@ The Warehouse Management System (WMS) MVP provides a comprehensive solution for:
 ## 📁 Project Structure
 
 WMS-Assignment/
-│
 ├── part1_sku_mapping/
-│   ├── sku_mapper.py     # Core mapping logic
-│   ├── gui.py            # Tkinter GUI interface
-│   └── data/             # Sample data files
+│   ├── sku_mapper.py         # Core mapping logic
+│   ├── gui.py                # Tkinter GUI interface
+│   └── data/                 # Sample data files
 │
 ├── part2_database/
-│   └── Airtables.txt     # Setup instructions for Airtable
+│   └── Airtables.txt         # Setup instructions for Airtable
 │
 ├── part3_webapp/
-│   ├── app.py            # Flask web application
-│   ├── templates/        # HTML templates
-│   └── static/           # CSS, JS, and assets
+│   ├── app.py                # Flask web application
+│   ├── templates/            # HTML templates
+│   ├── static/               # CSS, JS, and assets
+│   │   ├── js/               # JavaScript files for dashboard
+│   │   ├── css/              # Styling
+│   │   ├── outputs/          # Processed data outputs
+│   │   └── screenshots/      # Application screenshots
 │
-├── static/
-│   ├── js/               # JavaScript files for dashboard
-│   ├── css/              # Styling
-│   ├── outputs/          # Processed data outputs
-│   └── screenshots/      # Application screenshots
-│
-├── .env                  # Environment variables (API keys)
-└── README.md             # Project documentation
-
+├── .env                      # Environment variables (API keys)
+└── README.md                 # Project documentation
 
 
 ## 🛠 Technologies Used
