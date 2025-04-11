@@ -65,6 +65,11 @@ The Warehouse Management System (WMS) MVP provides a comprehensive solution for:
 ![Home Page](static/screenshots/home.png)
 ![AI Dashboard](static/screenshots/ai-dashboard.png)
 
+## 🎥 Loom Demo Video
+
+Check out the full walkthrough of the WMS MVP in this Loom video:
+https://www.loom.com/share/bdb9255db8a24cd29a98a3b805c3ae57?sid=6b6ef988-5848-4817-979f-df8062df59f0
+
 ## 📁 Project Structure
 
 WMS-Assignment/
