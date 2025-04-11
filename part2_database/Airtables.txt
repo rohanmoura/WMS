@@ -1,13 +1,15 @@
-📊 Part 2: Setting up Airtable Dashboard for Sales Data
+📊 Part 2: Data Dashboard Implementation
 
-This document explains how to use Airtable as a visual database to manage and analyze mapped sales data from Part 1.
+This document explains how to set up a data dashboard for the WMS project using either Airtable or the built-in local dashboard.
 
 ---
+
+## Option 1: Airtable Dashboard (Recommended for Production)
 
 ✅ Step-by-Step Instructions:
 
 1. Go to Airtable using the invite link below:
-   🔗 https://airtable.com/invite/l?inviteId=invaevSA2u6Aqf2t3&inviteToken=8e9095e02cff4c853a0e3e253d81edbe4d920ff2db2d78bc7551310c84dbe15b&utm_medium=email&utm_source=product_team&utm_content=transactional-alerts
+   🔗 https://airtable.com/invite/l?inviteId=invaevSA2u6Aqf2t3&inviteToken=8e9095e02cff4c853a0e3e253d81edbe4d920ff2db2d78bc7551310c84dbe15b
 
 2. Log in or sign up to Airtable.
 
@@ -37,29 +39,55 @@ This document explains how to use Airtable as a visual database to manage and an
    ➤ Account > Developer Hub > Generate API Token
 
 8. Get your **Base ID**:
-   ➤ From Airtable’s API documentation (https://airtable.com/api)
+   ➤ From Airtable's API documentation (https://airtable.com/api)
 
-9. Add your `API_KEY` and `BASE_ID` to a `.env` file in your project root.
-
-Example: AIRTABLE_API_KEY=your_token_here AIRTABLE_BASE_ID=app123456789
+9. Add your `API_KEY` and `BASE_ID` to a `.env` file in your project root:
 
 
-10. The backend script (`airtable.py`) will use these to upload processed sales data automatically.
+10. The web application will use these credentials to upload processed sales data automatically.
 
 ---
 
-🧠 Logic Recap:
+## Option 2: Built-in Local Dashboard (Fallback Solution)
 
-Once the user uploads sales files and mapping is complete (via GUI or web), the mapped DataFrame is sent to Airtable via their REST API. This keeps the data centralized and ready for visualization.
+If Airtable integration is not available or you prefer a self-contained solution, our application includes a built-in dashboard:
+
+1. **How it works**:
+- Processed data is stored locally as JSON files
+- The Flask web application loads this data into an in-memory DuckDB database
+- Interactive dashboard is rendered using Chart.js and Bootstrap
+
+2. **Features**:
+- Data Table View: Browse all processed records
+- Charts View: Visualize data with interactive charts
+- Logs View: Review processing logs
+- AI Assistant: Ask questions about your data in natural language
+
+3. **No setup required**:
+- This option works out-of-the-box with no external dependencies
+- All visualizations are generated client-side using JavaScript
+- Data is stored locally in the `static/outputs` directory
+
+---
+
+🧠 Implementation Details:
+
+Our implementation supports both options:
+1. If Airtable credentials are provided in the `.env` file, data will be synced to Airtable
+2. If credentials are missing or invalid, the system automatically falls back to the local dashboard
+3. The web interface includes an embedded view of either dashboard option
+
+This dual approach ensures flexibility while maintaining all functionality regardless of external service availability.
 
 ---
 
 📌 Notes:
 
-- You can use Table.ai or NoCodeDB as alternatives if preferred.
-- Use filters and group views in Airtable for easy drill-downs.
-- Make sure column names match exactly to avoid upload errors.
+- The local dashboard provides all essential functionality without external dependencies
+- For larger datasets or multi-user scenarios, Airtable is recommended
+- You can use Table.ai, Baserow, or NoCodeDB as alternatives to Airtable if preferred
+- Make sure column names match exactly to avoid upload errors
 
 ---
 
-👨‍💻 Created by Rohan for CSTE WMS Automation Assignment
+👨‍💻 Created for CSTE WMS Automation Assignment

@@ -1,37 +1,255 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Airtable Dashboard</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
-  <script>
-    function switchView(viewId) {
-      const iframe = document.getElementById('airtable-frame');
-      if (viewId === 'grid') {
-        iframe.src = "https://airtable.com/embed/appvZvjLsLPvfkZjn/shr7Y2zIu7aXWTSu9?viewControls=on";
-      } else if (viewId === 'top') {
-        iframe.src = "https://airtable.com/embed/appvZvjLsLPvfkZjn/shrh1QyW7upFqLTnx?viewControls=on";
-      }
-    }
-  </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-light">
-  <div class="container mt-4">
-    <h3 class="mb-3">📊 Airtable Dashboard</h3>
-    <div class="mb-3">
-      <button class="btn btn-outline-primary btn-sm me-2" onclick="switchView('grid')">🗂 Grid View</button>
-      <button class="btn btn-outline-success btn-sm" onclick="switchView('top')">📈 Top Selling Products</button>
+<body>
+    <div class="container-fluid">
+        <header class="d-flex justify-content-between align-items-center py-3 mb-4 border-bottom">
+            <div class="d-flex align-items-center">
+                <h1 class="h3 me-3">WMS Dashboard</h1>
+            </div>
+            <div>
+                <button id="ai-assistant-btn" class="btn btn-success me-2">
+                    <i class="bi bi-robot"></i> AI Assistant
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="bi bi-arrow-left"></i> Back to Mapping Tool
+                </a>
+            </div>
+        </header>
+
+        <!-- Hidden input fields to store data from server -->
+        <input type="hidden" id="data-file" value="{{ local_data }}">
+        <input type="hidden" id="has-logs" value="{% if logs %}true{% else %}false{% endif %}">
+        
+        <!-- Debug info - remove in production -->
+        <div class="alert alert-info" role="alert">
+            <strong>Debug Info:</strong> Data file: {{ local_data }}, Result file: {{ result_file }}, Log file: {{ log_file }}
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Data Views</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="dataTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="data-table-tab" data-bs-toggle="tab" data-bs-target="#data-table" type="button" role="tab" aria-controls="data-table" aria-selected="true">
+                                    <i class="bi bi-table"></i> Data Table
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="charts-tab" data-bs-toggle="tab" data-bs-target="#charts" type="button" role="tab" aria-controls="charts" aria-selected="false">
+                                    <i class="bi bi-bar-chart"></i> Charts
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false">
+                                    <i class="bi bi-file-text"></i> View Logs
+                                </button>
+                            </li>
+                        </ul>
+                        <div class="tab-content mt-3" id="dataTabsContent">
+                            <!-- Data Table Tab -->
+                            <div class="tab-pane fade show active" id="data-table" role="tabpanel" aria-labelledby="data-table-tab">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead id="table-header">
+                                            <tr>
+                                                <th>Loading...</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="table-body">
+                                            <tr>
+                                                <td>Loading data...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- Charts Tab -->
+                            <div class="tab-pane fade" id="charts" role="tabpanel" aria-labelledby="charts-tab">
+                                <div class="row">
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Status Distribution</h5>
+                                                <canvas id="statusChart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Orders by Region</h5>
+                                                <canvas id="regionChart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Logs Tab -->
+                            <div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Mapping Logs</h5>
+                                        {% if logs %}
+                                            <pre class="bg-light p-3 rounded">{{ logs }}</pre>
+                                        {% else %}
+                                            <p class="text-muted">No logs available.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Database View Tab -->
+                            <div class="tab-pane fade" id="database" role="tabpanel" aria-labelledby="database-tab">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Database View</h5>
+                                        <p>This view allows you to interact with the data as if it were in a database.</p>
+                                        
+                                        <div class="mb-3">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="search-input" placeholder="Search...">
+                                                <button class="btn btn-outline-secondary" type="button" id="search-btn">Search</button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <button class="btn btn-sm btn-outline-primary me-2" id="filter-all">All</button>
+                                            <button class="btn btn-sm btn-outline-primary me-2" id="filter-sales">Sales</button>
+                                            <button class="btn btn-sm btn-outline-primary me-2" id="filter-returns">Returns</button>
+                                            <button class="btn btn-sm btn-outline-success" id="add-column-btn">Add Calculated Column</button>
+                                        </div>
+                                        
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-hover">
+                                                <thead id="editable-header">
+                                                    <!-- Will be populated by JS -->
+                                                </thead>
+                                                <tbody id="editable-body">
+                                                    <!-- Will be populated by JS -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Mapped Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Total Records</h5>
+                                        <h2 class="display-4" id="mapped-data-count">-</h2>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Replace the download results card with this -->
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Download Results</h5>
+                                        {% if result_file %}
+                                            <a href="{{ url_for('download_file', file_type='result', filename=result_file) }}" 
+                                               class="btn btn-light mt-2">Download Excel</a>
+                                        {% else %}
+                                            <p class="text-white">No result file available</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Replace the download logs card with this -->
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Download Logs</h5>
+                                        {% if log_file %}
+                                            <a href="{{ url_for('download_file', file_type='log', filename=log_file) }}" 
+                                               class="btn btn-light mt-2">Download Logs</a>
+                                        {% else %}
+                                            <p class="text-white">No log file available</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="ratio ratio-16x9">
-      <iframe id="airtable-frame"
-              class="airtable-embed"
-              src="https://airtable.com/embed/appvZvjLsLPvfkZjn/shr7Y2zIu7aXWTSu9?viewControls=on"
-              frameborder="0"
-              width="100%"
-              height="600"
-              style="background: transparent; border: 1px solid #ccc; border-radius: 8px;">
-      </iframe>
+
+    <!-- AI Assistant Modal -->
+    <div class="modal fade" id="ai-assistant-modal" tabindex="-1" aria-labelledby="ai-assistant-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ai-assistant-modal-label">AI Data Assistant</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="ai-query-input" class="form-label">Ask a question about your data:</label>
+                        <input type="text" class="form-control" id="ai-query-input" 
+                            placeholder="e.g., Show me top 5 products by sales, Calculate return rate, Add a profit column">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" id="ai-query-btn">Ask AI</button>
+                    </div>
+                    <div class="mt-4" id="ai-result-container"></div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
+
+    <!-- Add this before the closing </body> tag -->
+    <!-- Bootstrap JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Then load your scripts in the correct order -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-viz.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-db.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-ai.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-init.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-check.js') }}"></script>
+
+    <!-- Add Bootstrap JS for modal functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <script>
+        // Initialize the dashboard when the page loads
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("Dashboard HTML loaded, data file: {{ local_data }}");
+            // This will be called from dashboard.js
+        });
+    </script>
 </body>
 </html>

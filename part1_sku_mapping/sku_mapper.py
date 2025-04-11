@@ -3,9 +3,7 @@ import os
 from datetime import datetime
 import re
 
-
 class MappingLoader:
-
     def __init__(self, mapping_file):
         self.mapping_file = mapping_file
         self.mapping_df = None
@@ -13,38 +11,49 @@ class MappingLoader:
         self.load_mapping()
 
     def load_mapping(self):
-        # Load Master SKU mappings
-        self.mapping_df = pd.read_excel(self.mapping_file,
-                                        sheet_name="Msku With Skus")
-        self.mapping_df.columns = self.mapping_df.columns.str.strip().str.lower()
-
-        # Load Combo SKUs
-        self.combo_df = pd.read_excel(self.mapping_file,
-                                      sheet_name="Combos skus")
-        self.combo_df.columns = self.combo_df.columns.str.strip().str.lower()
+        # Add error handling for file loading
+        try:
+            self.mapping_df = pd.read_excel(self.mapping_file, sheet_name="Msku With Skus")
+            self.mapping_df.columns = self.mapping_df.columns.str.strip().str.lower()
+            
+            # Create a dictionary for faster lookups
+            self.sku_to_msku = dict(zip(self.mapping_df['sku'].str.strip(), self.mapping_df['msku']))
+            
+            self.combo_df = pd.read_excel(self.mapping_file, sheet_name="Combos skus")
+            self.combo_df.columns = self.combo_df.columns.str.strip().str.lower()
+            
+            # Create a dictionary for combo lookups
+            self.combo_dict = {}
+            for _, row in self.combo_df.iterrows():
+                # Convert to string first to handle integers
+                combo_key = str(row['combo']).strip()
+                parts = [str(val).strip() for val in row.iloc[1:] if pd.notna(val)]
+                if parts:
+                    self.combo_dict[combo_key] = parts
+        except Exception as e:
+            raise ValueError(f"Error loading mapping file: {str(e)}")
 
     def map_single_sku(self, sku):
-        if not re.match(r'^[A-Za-z0-9]+$', sku.strip()):
+        if not sku or not isinstance(sku, str):
             return None
-
-        result = self.mapping_df[self.mapping_df['sku'] == sku.strip()]
-        return result.iloc[0]['msku'] if not result.empty else None
+            
+        sku = sku.strip()
+        if not re.match(r'^[A-Za-z0-9\-_&.]+$', sku):  # Updated regex to include more characters
+            return None
+            
+        # Use dictionary lookup instead of DataFrame filtering (much faster)
+        return self.sku_to_msku.get(sku)
 
     def get_combo_parts(self, combo_sku):
-        row = self.combo_df[self.combo_df['combo'] == combo_sku.strip()]
-        if not row.empty:
-            parts = []
-            for col in row.columns[1:]:  # Skip 'combo' column
-                val = row.iloc[0][col]
-                if pd.notna(val):
-                    parts.append(val.strip())
-            return parts
-        return None
-
+        if not combo_sku or not isinstance(combo_sku, str):
+            return None
+            
+        combo_sku = combo_sku.strip()
+        # Use dictionary lookup instead of DataFrame filtering
+        return self.combo_dict.get(combo_sku)
 
 class SalesProcessor:
-
-    def __init__(self, mapper: MappingLoader, sales_path: str, output_dir=""):
+    def __init__(self, mapper: MappingLoader, sales_path: str, output_dir="output"):
         self.mapper = mapper
         self.sales_path = sales_path
         self.output_dir = output_dir
@@ -61,24 +70,26 @@ class SalesProcessor:
         return None
 
     def load_sales(self):
-        if self.sales_path.endswith(".csv"):
-            self.sales_df = pd.read_csv(self.sales_path)
-        else:
-            self.sales_df = pd.read_excel(self.sales_path)
+        try:
+            if self.sales_path.endswith(".csv"):
+                self.sales_df = pd.read_csv(self.sales_path)
+            else:
+                self.sales_df = pd.read_excel(self.sales_path)
 
-        self.sales_df.columns = self.sales_df.columns.str.strip().str.lower()
-        self.sku_column = self.detect_sku_column(self.sales_df.columns)
+            self.sales_df.columns = self.sales_df.columns.str.strip().str.lower()
+            self.sku_column = self.detect_sku_column(self.sales_df.columns)
 
-        if not self.sku_column:
-            raise ValueError(
-                "Sales sheet must contain a recognizable SKU column (e.g., 'SKU', 'FNSKU', 'ASIN')."
-            )
+            if not self.sku_column:
+                raise ValueError("Sales sheet must contain a recognizable SKU column (e.g., 'SKU', 'FNSKU').")
+        except Exception as e:
+            raise ValueError(f"Error loading sales file: {str(e)}")
 
-    def process(self):
+    def process(self, output_filename=None, log_filename=None):
         self.load_sales()
-        self.sales_df['msku'] = self.sales_df[self.sku_column].apply(self._map_sku)
+        # Apply mapping in a more efficient way
+        self.sales_df['msku'] = self.sales_df[self.sku_column].astype(str).apply(self._map_sku)
         self._generate_logs()
-        return self._save_output()
+        return self._save_output(output_filename, log_filename)
 
     def _map_sku(self, sku):
         sku = str(sku).strip()
@@ -105,7 +116,6 @@ class SalesProcessor:
             else:
                 mapped_parts.append(f"[MISSING:{part}]")
                 self.logs.append(f"Missing part in combo: {part}")
-
         return '+'.join(mapped_parts)
 
     def _generate_logs(self):
@@ -122,16 +132,45 @@ class SalesProcessor:
         ]
         self.logs = summary
 
-    def _save_output(self):
+    def _save_output(self, output_filename=None, log_filename=None):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir, exist_ok=True)
-
-        output_path = os.path.join(self.output_dir, f"mapped_output_{timestamp}.xlsx")
-        self.sales_df.to_excel(output_path, index=False)
-
-        log_path = os.path.join(self.output_dir, f"mapping_log_{timestamp}.txt")
-        with open(log_path, "w") as f:
-            f.write("\n".join(self.logs))
-
+    
+        if not output_filename:
+            output_filename = f"mapped_output_{timestamp}.xlsx"
+        if not log_filename:
+            log_filename = f"mapping_log_{timestamp}.txt"
+    
+        output_path = os.path.join(self.output_dir, output_filename)
+        log_path = os.path.join(self.output_dir, log_filename)
+    
+        # Fix NaN values before saving
+        self.sales_df = self.sales_df.fillna("")
+        
+        # Save with absolute paths
+        try:
+            self.sales_df.to_excel(output_path, index=False)
+            with open(log_path, "w") as f:
+                f.write("\n".join(self.logs))
+                
+                # Also save as JSON for the dashboard
+                json_filename = output_filename.replace('.xlsx', '.json')
+                json_path = os.path.join(self.output_dir, json_filename)
+                self.sales_df.to_json(json_path, orient='records', indent=2)
+                print(f"JSON file saved to: {json_path}")
+        except Exception as e:
+            raise ValueError(f"Error saving output files: {str(e)}")
+    
         return output_path, log_path
+
+# Optional CLI usage for testing
+if __name__ == "__main__":
+    wms_file = input("Enter path to WMS mapping Excel file: ").strip()
+    sales_file = input("Enter path to Sales Excel/CSV file: ").strip()
+    
+    mapper = MappingLoader(wms_file)
+    processor = SalesProcessor(mapper, sales_file)
+    
+    output_file, log_file = processor.process()
+    print(f"✅ Mapping Complete!\nOutput File: {output_file}\nLog File: {log_file}")

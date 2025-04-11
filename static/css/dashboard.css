@@ -1,0 +1,99 @@
+.dashboard-container {
+  padding: 20px;
+}
+.chart-container {
+  height: 300px;
+  margin-bottom: 20px;
+}
+.data-table {
+  max-height: 500px;
+  overflow-y: auto;
+}
+/* Airtable-like styling */
+table.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  table-layout: auto;
+}
+table.table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  padding: 10px 15px;
+  border-bottom: 2px solid #dee2e6;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+table.table td {
+  padding: 10px 15px;
+  border-bottom: 1px solid #dee2e6;
+  vertical-align: middle;
+}
+table.table tr:hover {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+/* Column sizing */
+table.table th, table.table td {
+  min-width: 150px;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Special columns */
+table.table th:first-child, table.table td:first-child {
+  position: sticky;
+  left: 0;
+  background-color: #fff;
+  z-index: 5;
+  box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
+}
+table.table th:first-child {
+  background-color: #f8f9fa;
+  z-index: 15;
+}
+/* Add horizontal scrolling to tables */
+.table-responsive {
+  overflow-x: auto;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+/* Add relationship styling */
+.related-data {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 15px;
+  margin-top: 15px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+.relation-link {
+  color: #0d6efd;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* Highlight related rows */
+tr.highlight {
+  background-color: rgba(25, 135, 84, 0.15) !important;
+}
+/* Editable cell styling */
+.editable-cell {
+  position: relative;
+  cursor: pointer;
+}
+.editable-cell:hover::after {
+  content: "✏️";
+  position: absolute;
+  right: 5px;
+  opacity: 0.5;
+}
+/* Database controls styling */
+.database-controls {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
